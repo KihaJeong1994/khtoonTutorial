@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:khtoon/models/webtoon_detail_model.dart';
 import 'package:khtoon/models/webtoon_episode_model.dart';
 import 'package:khtoon/services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../widgets/episode_widget.dart';
 import '../widgets/webtoon_image.dart';
@@ -23,20 +24,42 @@ class _DetailScreenState extends State<DetailScreen> {
   late Future<WebtoonDetailModel>
       webtoon; // you cannot initialize variable with parent's field(widget.id) here => use 'late' modifier to initialize later
   late Future<List<WebtoonEpisodeModel>> episodes;
+  late SharedPreferences pref;
+  bool isLiked = false;
 
-  // Future<void> _launchUrl(String id) async {
-  //   var url =
-  //       'https://comic.naver.com/webtoon/detail?titleId=${widget.id}&no=$id';
-  //   if (!await launchUrlString(url)) {
-  //     throw Exception('Could not launch $url');
-  //   }
-  // }
+  Future initPrefs() async {
+    pref = await SharedPreferences.getInstance();
+    final likedToons = pref.getStringList('likedToons');
+    if (likedToons != null) {
+      if (likedToons.contains(widget.id)) {
+        setState(() {
+          isLiked = true;
+        });
+      }
+    } else {
+      await pref.setStringList('likedToons', []);
+    }
+  }
+
+  void onFavoritesPressed() async {
+    final likedToons = pref.getStringList('likedToons');
+    if (isLiked) {
+      likedToons!.remove(widget.id);
+    } else {
+      likedToons!.add(widget.id);
+    }
+    await pref.setStringList('likedToons', likedToons);
+    setState(() {
+      isLiked = !isLiked;
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     webtoon = ApiService.getToonById(widget.id);
     episodes = ApiService.getLatestEpisodesById(widget.id);
+    initPrefs();
   }
 
   @override
@@ -57,8 +80,10 @@ class _DetailScreenState extends State<DetailScreen> {
         elevation: 2,
         actions: [
           IconButton(
-            onPressed: (() {}),
-            icon: const Icon(Icons.favorite_outline_rounded),
+            onPressed: onFavoritesPressed,
+            icon: isLiked
+                ? const Icon(Icons.favorite_rounded)
+                : const Icon(Icons.favorite_outline_rounded),
           ),
           const SizedBox(
             width: 20,
